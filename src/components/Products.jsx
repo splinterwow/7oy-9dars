@@ -1,30 +1,37 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import Axios from "../utils/axios";
 import { CiBookmark } from "react-icons/ci";
 import { MdLocalMovies } from "react-icons/md";
 import { FaBookmark } from "react-icons/fa";
 import { toast } from "react-hot-toast";
+import useDebounce from "../utils/useDebounce";
 
 const Products = () => {
   const [data, setData] = useState([]);
   const [bookmarkedMovies, setBookmarkedMovies] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   useEffect(() => {
-    // Fetch movies data
-    axios
-      .get("https://api.kinopoisk.dev/v1.4/movie?rating.imdb=8-10&limit=30", {
-        headers: {
-          "X-API-KEY": "Z95NM1Z-SD44EGA-GQ8QVTP-VA07DE7",
-        },
-      })
-      .then((response) => {
-        setData(response.data.docs);
-        const savedMovies =
-          JSON.parse(localStorage.getItem("bookmarkedMovies")) || [];
-        setBookmarkedMovies(savedMovies);
-      })
-      .catch((error) => console.error("Error fetching movies:", error));
-  }, []);
+    if (!debouncedSearchQuery) {
+      Axios.get("/movie?rating.imdb=8-10&limit=30")
+        .then((response) => {
+          setData(response.data.docs);
+          const savedMovies =
+            JSON.parse(localStorage.getItem("bookmarkedMovies")) || [];
+          setBookmarkedMovies(savedMovies);
+        })
+        .catch((error) => console.error("Error fetching movies:", error));
+    } else {
+      Axios.get(
+        `/movie/search?query=${encodeURIComponent(debouncedSearchQuery)}`
+      )
+        .then((response) => {
+          setData(response.data.docs);
+        })
+        .catch((error) => console.error("Error searching movies:", error));
+    }
+  }, [debouncedSearchQuery]);
 
   const handleSave = (movie) => {
     const isBookmarked = bookmarkedMovies.some((m) => m.id === movie.id);
@@ -38,7 +45,9 @@ const Products = () => {
     );
     setBookmarkedMovies(updatedBookmarkedMovies);
     toast[isBookmarked ? "error" : "success"](
-      isBookmarked ? "Movie removed from bookmarks" : "Movie added to bookmarks!"
+      isBookmarked
+        ? "Movie removed from bookmarks"
+        : "Movie added to bookmarks!"
     );
   };
 
@@ -46,8 +55,10 @@ const Products = () => {
     <div className="bg-gray-900 text-white min-h-screen p-4 ml-[80px]">
       <div className="flex justify-center items-center mb-6">
         <input
-          type="text"
+          type="search"
           placeholder="Search for movies"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           className="bg-gray-800 text-white rounded-lg p-2 w-full max-w-[1000px]"
         />
       </div>
